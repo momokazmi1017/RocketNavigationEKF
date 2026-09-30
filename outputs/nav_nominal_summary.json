@@ -1,0 +1,229 @@
+{
+  "liftoff detected (s)": 0.075,
+  "updates used / rejected": {
+    "gps": [
+      701,
+      0
+    ],
+    "baro": [
+      2919,
+      669
+    ],
+    "zupt": [
+      300,
+      0
+    ],
+    "zaru": [
+      299,
+      1
+    ]
+  },
+  "on the pad (T-1 s)": {
+    "position error (m)": [
+      1.46,
+      -3.04,
+      -2.27
+    ],
+    "position 1-sigma (m)": [
+      1.3,
+      1.3,
+      2.37
+    ],
+    "velocity error (m/s)": [
+      0.001,
+      0.002,
+      -0.001
+    ],
+    "velocity 1-sigma (m/s)": [
+      0.003,
+      0.003,
+      0.002
+    ],
+    "attitude error roll/pitch/yaw (deg)": [
+      -3.234,
+      -0.068,
+      0.299
+    ],
+    "attitude 1-sigma (deg)": [
+      1.904,
+      0.377,
+      0.387
+    ],
+    "accel bias 1-sigma (mg)": [
+      2.93,
+      6.85,
+      6.56
+    ],
+    "accel scale factor 1-sigma (ppm)": [
+      2875.0,
+      3000.0,
+      2999.0
+    ],
+    "baro offset error / 1-sigma (Pa)": [
+      -23.6,
+      24.8
+    ]
+  },
+  "burnout": {
+    "position error (m)": [
+      1.59,
+      -2.7,
+      -0.12
+    ],
+    "position 1-sigma (m)": [
+      1.28,
+      1.28,
+      1.29
+    ],
+    "velocity error (m/s)": [
+      0.046,
+      -0.036,
+      0.001
+    ],
+    "velocity 1-sigma (m/s)": [
+      0.052,
+      0.056,
+      0.065
+    ],
+    "attitude error roll/pitch/yaw (deg)": [
+      -0.048,
+      -0.008,
+      -0.013
+    ],
+    "attitude 1-sigma (deg)": [
+      0.264,
+      0.015,
+      0.015
+    ],
+    "accel bias 1-sigma (mg)": [
+      0.15,
+      0.63,
+      0.48
+    ],
+    "accel scale factor 1-sigma (ppm)": [
+      116.0,
+      2999.0,
+      2998.0
+    ],
+    "baro offset error / 1-sigma (Pa)": [
+      -1.3,
+      11.3
+    ]
+  },
+  "apogee": {
+    "position error (m)": [
+      -0.14,
+      -1.5,
+      -0.21
+    ],
+    "position 1-sigma (m)": [
+      1.17,
+      1.17,
+      0.65
+    ],
+    "velocity error (m/s)": [
+      -0.004,
+      -0.002,
+      -0.002
+    ],
+    "velocity 1-sigma (m/s)": [
+      0.019,
+      0.018,
+      0.012
+    ],
+    "attitude error roll/pitch/yaw (deg)": [
+      -0.152,
+      0.074,
+      -0.316
+    ],
+    "attitude 1-sigma (deg)": [
+      0.174,
+      0.224,
+      0.223
+    ],
+    "accel bias 1-sigma (mg)": [
+      0.09,
+      0.23,
+      0.22
+    ],
+    "accel scale factor 1-sigma (ppm)": [
+      33.0,
+      2985.0,
+      2123.0
+    ],
+    "baro offset error / 1-sigma (Pa)": [
+      -0.8,
+      2.4
+    ]
+  },
+  "flight max |error|": {
+    "position (m)": 3.0234813376345713,
+    "velocity (m/s)": 0.3000412828508714,
+    "pitch/yaw (deg)": 0.49452662393653796,
+    "roll (deg)": 3.765996840262799
+  },
+  "true sensor errors": {
+    "accel turn-on bias (mg)": [
+      0.01,
+      2.99,
+      -2.74
+    ],
+    "gyro turn-on bias (deg/s)": [
+      -0.343,
+      0.206,
+      0.842
+    ],
+    "accel scale factor (ppm)": [
+      5049.0,
+      -2915.0,
+      2744.0
+    ],
+    "baro offset (Pa)": -76.4
+  },
+  "calm flight, apogee": {
+    "position error (m)": [
+      -0.83,
+      1.39,
+      0.03
+    ],
+    "position 1-sigma (m)": [
+      1.17,
+      1.17,
+      0.64
+    ],
+    "velocity error (m/s)": [
+      -0.001,
+      0.003,
+      0.002
+    ],
+    "velocity 1-sigma (m/s)": [
+      0.021,
+      0.017,
+      0.012
+    ],
+    "attitude error roll/pitch/yaw (deg)": [
+      -0.065,
+      -0.108,
+      -0.416
+    ],
+    "attitude 1-sigma (deg)": [
+      0.16,
+      0.235,
+      0.274
+    ],
+    "accel bias 1-sigma (mg)": [
+      0.09,
+      0.24,
+      0.21
+    ],
+    "accel scale factor 1-sigma (ppm)": [
+      32.0,
+      3000.0,
+      2127.0
+    ],
+    "baro offset error / 1-sigma (Pa)": [
+      0.1,
+      2.4
+    ]
+  }
+}

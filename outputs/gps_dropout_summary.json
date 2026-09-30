@@ -1,0 +1,46 @@
+{
+  "Consumer MEMS (baseline)": {
+    "RMS horizontal error (m)": 11.05862126263366,
+    "filter's predicted horizontal 1-sigma (m)": 11.768384563115637,
+    "RMS altitude error (m)": 1.8053544048451138,
+    "RMS horizontal velocity error (m/s)": 0.5200223705464538,
+    "RMS tilt error at liftoff (deg)": 0.5442053446252036,
+    "position ANEES during outage": 2.453393704860022,
+    "position ANEES inside 95% band": 0.0,
+    "RMS horizontal error 3 s after the fix returns (m)": 1.7960716376378616,
+    "max filter-reported sigma ratio": 1.1969384372144454
+  },
+  "Industrial MEMS": {
+    "RMS horizontal error (m)": 7.95721668725972,
+    "filter's predicted horizontal 1-sigma (m)": 9.143282328625833,
+    "RMS altitude error (m)": 1.7083190715735892,
+    "RMS horizontal velocity error (m/s)": 0.34622278683864177,
+    "RMS tilt error at liftoff (deg)": 0.2408023271162292,
+    "position ANEES during outage": 2.3542657725530827,
+    "position ANEES inside 95% band": 0.016,
+    "RMS horizontal error 3 s after the fix returns (m)": 1.75791239950512,
+    "max filter-reported sigma ratio": 1.0754817260573946
+  },
+  "Tactical grade": {
+    "RMS horizontal error (m)": 5.123514557359727,
+    "filter's predicted horizontal 1-sigma (m)": 5.322385321931973,
+    "RMS altitude error (m)": 1.5167222956977384,
+    "RMS horizontal velocity error (m/s)": 0.19898426815947423,
+    "RMS tilt error at liftoff (deg)": 0.18430057976902636,
+    "position ANEES during outage": 2.7117124434670585,
+    "position ANEES inside 95% band": 0.915,
+    "RMS horizontal error 3 s after the fix returns (m)": 1.8766824721511859,
+    "max filter-reported sigma ratio": 1.00604401538572
+  },
+  "Consumer MEMS, no GPS after liftoff (at apogee)": {
+    "RMS horizontal error (m)": 65.06014689148691,
+    "filter's predicted horizontal 1-sigma (m)": 70.63736987896837,
+    "RMS altitude error (m)": 1.9527298461968035,
+    "RMS horizontal velocity error (m/s)": 1.31534101370334,
+    "RMS tilt error at liftoff (deg)": 0.5442123899130056,
+    "position ANEES during outage": 2.6093683237768803,
+    "position ANEES inside 95% band": 0.948,
+    "RMS horizontal error 3 s after the fix returns (m)": 56.49525160373905,
+    "max filter-reported sigma ratio": 1.1046735553321976
+  }
+}
