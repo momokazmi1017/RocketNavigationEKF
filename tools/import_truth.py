@@ -40,6 +40,21 @@ CASES = {
 }
 
 
+def vehicle_geometry(vehicle) -> dict:
+    """Outer dimensions (m, stations from the nose tip) for drawing the rocket."""
+    af, f = vehicle.airframe, vehicle.airframe.fins
+    return {
+        "length": af.length, "diameter": af.diameter, "nose_length": af.nose.length,
+        "x_cg": vehicle.mass_properties(0.0).x_cg,
+        "fin_root": f.root_chord, "fin_tip": f.tip_chord, "fin_span": f.span,
+        "fin_sweep": f.sweep, "fin_thickness": f.thickness, "fins": f.n,
+        "nozzle_exit_diameter": vehicle.engine.data.exit_diameter,
+        "rail_length": vehicle.rail_length,
+        "tanks": [[vehicle.ox_tank.station, vehicle.ox_tank.length],
+                  [vehicle.fuel_tank.station, vehicle.fuel_tank.length]],
+    }
+
+
 def export(name: str, wind: Wind) -> dict:
     spec, vehicle, site = load_sized()
     cfg = SimConfig(site=site, wind=wind, dt_out=0.001)
@@ -71,6 +86,7 @@ def export(name: str, wind: Wind) -> dict:
         "wind_from_deg": wind.from_deg,
         "rate_hz": RATE,
         "events": {k: float(v) for k, v in res.events.items()},
+        "vehicle": vehicle_geometry(vehicle),       # for the 3D viewer (tools/build_viewer.py)
     }
     out = ROOT / "data" / f"truth_{name}.npz"
     out.parent.mkdir(exist_ok=True)

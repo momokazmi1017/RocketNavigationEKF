@@ -1,0 +1,899 @@
+<title>E5-75 Navigation Replay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
+<style>
+  /* Same look as the project 2 flight replay: a daylight desert under slate instrument panels. */
+  :root {
+    color-scheme: dark;
+    --panel: rgba(20, 30, 40, 0.82);
+    --panel-edge: rgba(255, 255, 255, 0.10);
+    --ink: #eef3f6;
+    --ink-2: #a8b7c3;
+    --ink-3: #74889a;
+    --track: rgba(255, 255, 255, 0.14);
+    --rail: #d8dde2;
+    --powered: #ff8a3d;
+    --coast: #5aa9ff;
+    --estimate: #5ce1ff;
+    --gps: #7dffa0;
+    --ok: #4cc38a;
+    --warn: #ffb347;
+    --bad: #ff6b5e;
+    --focus: #ffd08a;
+    --sans: "IBM Plex Sans Condensed", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; overflow: hidden; background: #b9cbd8; color: var(--ink);
+    font: 14px/1.35 var(--sans);
+  }
+  #scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+  .hud {
+    position: fixed; inset: 0; pointer-events: none;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto;
+    gap: 12px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .panel {
+    pointer-events: auto; background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 8px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .brand { padding: 12px 14px; display: grid; gap: 10px; align-self: start; max-width: 370px; }
+  .brand h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
+  .brand p { margin: 0; color: var(--ink-2); font-size: 13px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+  .row-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+  .seg button {
+    font: 500 13px var(--sans); color: var(--ink-2); background: transparent;
+    border: 1px solid var(--track); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { color: #15202a; background: var(--rail); border-color: var(--rail); }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-pressed="true"]:hover { color: #15202a; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .toggles label { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; cursor: pointer; }
+  .toggles input { accent-color: var(--estimate); }
+  .legend { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; font-size: 12px; color: var(--ink-2); align-items: center; }
+  .sw { width: 14px; height: 10px; border-radius: 2px; }
+  .sw.truth { background: #f2f2ee; }
+  .sw.est { background: var(--estimate); opacity: 0.7; }
+  .sw.bubble { background: transparent; border: 1.5px solid var(--estimate); border-radius: 50%; height: 10px; }
+  .sw.gps { width: 7px; height: 7px; border-radius: 50%; background: var(--gps); margin-left: 3px; }
+  .nc { text-transform: none; }
+  .note { font-size: 12px; color: var(--warn); min-height: 1em; }
+
+  .telemetry { padding: 12px 14px; align-self: start; width: 290px; display: grid; gap: 9px; }
+  .clock { font: 500 28px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .phase { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .phase i { width: 10px; height: 10px; border-radius: 50%; background: var(--rail); display: inline-block; }
+  .readouts { display: grid; grid-template-columns: repeat(3, auto); gap: 2px 14px; margin: 0; }
+  .readouts div { display: grid; }
+  .readouts dt { color: var(--ink-3); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .readouts dd { margin: 0; font: 15px var(--mono); font-variant-numeric: tabular-nums; }
+  .readouts dd small { color: var(--ink-3); font-size: 11px; margin-left: 2px; }
+  h2 { margin: 4px 0 0; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+       border-top: 1px solid var(--panel-edge); padding-top: 8px; }
+  .sensors { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 13px; }
+  .sensors span:nth-child(odd) { color: var(--ink-3); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--ok); }
+  .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+  .errs { display: grid; grid-template-columns: auto auto auto; gap: 3px 10px; font-size: 13px; align-items: center; }
+  .errs .hd { color: var(--ink-3); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .errs .v { font: 13px var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .meter { grid-column: 1 / -1; height: 3px; background: var(--track); border-radius: 2px; overflow: hidden; margin: -1px 0 3px; }
+  .meter span { display: block; height: 100%; width: 0; background: var(--estimate); }
+  .meter span.over { background: var(--bad); }
+  #chart { width: 100%; height: 86px; display: block; }
+  .chart-cap { font-size: 11px; color: var(--ink-3); }
+
+  .transport { grid-column: 1 / -1; padding: 10px 14px 12px; display: grid; gap: 8px; }
+  .transport-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .play {
+    width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--estimate); color: #0c2230; display: grid; place-items: center; flex: none;
+  }
+  .play svg { width: 16px; height: 16px; fill: currentColor; }
+  .timeline { position: relative; flex: 1 1 320px; min-width: 0; height: 34px; }
+  .timeline input { position: absolute; inset: 12px 0 auto; width: 100%; margin: 0; accent-color: var(--estimate); }
+  .ticks { position: absolute; inset: 0; pointer-events: none; }
+  .tick { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .tick::after { content: ""; position: absolute; left: 50%; top: 14px; width: 1px; height: 12px; background: var(--ink-3); }
+  .tick.end { transform: translateX(-100%); }
+  .tick.end::after { left: auto; right: 0; }
+  .band { position: absolute; top: 14px; height: 12px; background: rgba(255, 107, 94, 0.30); border-radius: 2px; }
+  .speed-label { color: var(--ink-3); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .tag {
+    position: fixed; left: 0; top: 0; pointer-events: none; transform: translate(10px, -50%);
+    font: 12px var(--mono); color: #15202a; background: rgba(238, 243, 246, 0.92);
+    padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+  }
+  .tag::before {
+    content: ""; position: absolute; left: -12px; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+    border: 2px solid rgba(238, 243, 246, 0.95); border-radius: 50%;
+  }
+  .notice { position: fixed; inset: auto 16px 50% 16px; text-align: center; color: #15202a; font-size: 16px; }
+
+  @media (max-width: 760px) {
+    .hud { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; gap: 8px; }
+    .brand { max-width: none; padding: 10px 12px; gap: 8px; }
+    .brand p, .brand .eyebrow, .legend, .toggles, .note, .row-label, #magSel,
+    #chart, .chart-cap, .sensors, .telemetry h2:first-of-type { display: none; }
+    .brand h1 { font-size: 17px; }
+    .telemetry { width: auto; padding: 10px 12px; gap: 6px; grid-template-columns: auto 1fr; align-items: center; }
+    .telemetry .clock { font-size: 22px; }
+    .readouts, .errs, .telemetry h2 { grid-column: 1 / -1; }
+    .tick.minor { color: transparent; }
+    .transport { grid-column: 1; }
+  }
+</style>
+
+<canvas id="scene" aria-label="3D replay of the rocket flight with the navigation filter's estimate"></canvas>
+
+<div class="hud">
+  <section class="panel brand" aria-label="Scenario">
+    <div>
+      <div class="eyebrow">Error-state Kalman filter · IMU + GPS + barometer</div>
+      <h1>E5-75 Navigation Replay</h1>
+    </div>
+    <p id="blurb"></p>
+    <div class="seg" id="flightSel" role="group" aria-label="Scenario"></div>
+    <div class="seg" id="camSel" role="group" aria-label="Camera">
+      <button type="button" data-cam="chase" aria-pressed="true">Chase</button>
+      <button type="button" data-cam="tracking" aria-pressed="false">Tracking camera</button>
+      <button type="button" data-cam="overview" aria-pressed="false">Overview</button>
+    </div>
+    <div>
+      <div class="row-label">Draw the pointing error</div>
+      <div class="seg" id="magSel" role="group" aria-label="Pointing error exaggeration">
+        <button type="button" data-mag="1" aria-pressed="true">True size</button>
+        <button type="button" data-mag="10" aria-pressed="false">×10</button>
+        <button type="button" data-mag="50" aria-pressed="false">×50</button>
+      </div>
+    </div>
+    <div class="note" id="magNote"></div>
+    <div class="toggles">
+      <label><input type="checkbox" id="showGhost" checked> Estimate</label>
+      <label><input type="checkbox" id="showBubble" checked> 3σ bubble</label>
+      <label><input type="checkbox" id="showGps" checked> GPS fixes</label>
+      <label><input type="checkbox" id="showPath" checked> Paths</label>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <i class="sw truth"></i><span>Real rocket (the truth, from the 6-DOF simulator)</span>
+      <i class="sw est"></i><span>Where the filter thinks it is, and how it's pointed</span>
+      <i class="sw" style="height:2px;background:#ffd08a"></i><span>The error: real rocket to estimate</span>
+      <i class="sw bubble"></i><span>The filter's 3σ uncertainty: the real rocket should stay inside</span>
+      <i class="sw gps"></i><span>GPS fixes (10 Hz, noisy)</span>
+    </div>
+  </section>
+
+  <section class="panel telemetry" aria-label="Telemetry" aria-live="off">
+    <div class="clock" id="clock">T−00:05.0</div>
+    <div class="phase"><i id="phaseDot"></i><span id="phaseName">On the pad</span></div>
+    <dl class="readouts">
+      <div><dt>Altitude</dt><dd><span id="alt">0</span><small>ft</small></dd></div>
+      <div><dt>Speed</dt><dd><span id="spd">0</span><small>kn</small></dd></div>
+      <div><dt>Mach</dt><dd id="mach">0.00</dd></div>
+    </dl>
+    <h2>Sensors and filter</h2>
+    <div class="sensors">
+      <span>Filter</span><span id="sMode"></span>
+      <span>IMU</span><span><i class="dot"></i>200 Hz</span>
+      <span>GPS</span><span id="sGps"></span>
+      <span>Barometer</span><span id="sBaro"></span>
+    </div>
+    <h2>Error vs the filter's 3<span class="nc">σ</span></h2>
+    <div class="errs" id="errs">
+      <span class="hd"></span><span class="hd v">Error</span><span class="hd v">3<span class="nc">σ</span></span>
+    </div>
+    <canvas id="chart" aria-hidden="true"></canvas>
+    <div class="chart-cap">Horizontal position error (line) and the filter's 3σ (band); red = no GPS</div>
+  </section>
+
+  <div></div>
+
+  <section class="panel transport" aria-label="Playback">
+    <div class="transport-row">
+      <button type="button" class="play" id="play" aria-label="Pause">
+        <svg viewBox="0 0 16 16" id="playIcon"><rect x="3" y="2" width="3.5" height="12"/><rect x="9.5" y="2" width="3.5" height="12"/></svg>
+      </button>
+      <div class="timeline">
+        <div class="ticks" id="ticks"></div>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Flight time">
+      </div>
+    </div>
+    <div class="transport-row">
+      <span class="speed-label">Speed</span>
+      <div class="seg" id="speedSel" role="group" aria-label="Playback speed">
+        <button type="button" data-speed="0.25" aria-pressed="false">¼×</button>
+        <button type="button" data-speed="0.5" aria-pressed="false">½×</button>
+        <button type="button" data-speed="1" aria-pressed="true">1×</button>
+        <button type="button" data-speed="3" aria-pressed="false">3×</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="tag" id="tag" hidden></div>
+<div class="notice" id="notice" hidden>Navigation data missing: run tools/build_viewer.py to build this page.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const DATA = /*__NAV_DATA__*/null;
+if (!DATA) { document.getElementById("notice").hidden = false; throw new Error("no navigation data"); }
+
+const FT = 0.3048, KN = 0.514444;
+const PHASES = { "-1": "On the pad", 0: "On the rail", 1: "Powered ascent", 2: "Coast" };
+const PHASE_COLORS = { "-1": "#d8dde2", 0: "#d8dde2", 1: "#ff8a3d", 2: "#5aa9ff" };
+const EST_COLOR = 0x5ce1ff, GPS_COLOR = 0x7dffa0;
+const V = DATA.vehicle;
+const EL = DATA.site.rail_elevation_deg * Math.PI / 180;
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ENU (east, north, up) -> three.js (x = east, y = up, z = -north)
+const enu = (e, n, u) => new THREE.Vector3(e, u, -n);
+
+// --- Renderer, scene, cameras -------------------------------------------------
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+const HAZE = new THREE.Color("#e3d9c6");
+scene.fog = new THREE.Fog(HAZE, 6000, 70000);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.3, 200000);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.495;
+
+scene.add(new THREE.HemisphereLight(0xcfe3ff, 0x8a6e4a, 0.55));
+const sun = new THREE.DirectionalLight(0xfff1dc, 0.85);
+sun.position.set(-3000, 6000, 2500);
+scene.add(sun);
+
+{
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(150000, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: { top: { value: new THREE.Color("#3f78b8") }, horizon: { value: HAZE } },
+      vertexShader: "varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }",
+      fragmentShader: "uniform vec3 top; uniform vec3 horizon; varying float h; void main(){ float k = pow(clamp(h,0.,1.),0.45); gl_FragColor = vec4(mix(horizon, top, k),1.); }",
+    }));
+  scene.add(sky);
+}
+
+// --- Terrain: the Jornada del Muerto basin (as in the project 2 replay) ----------
+function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+function noise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, y) { let s = 0, a = 0.5; for (let i = 0; i < 5; i++) { s += a * noise(x, y); x *= 2.03; y *= 2.03; a *= 0.5; } return s; }
+function terrainHeight(e, n) {
+  const east = Math.max(0, Math.abs(e + 2000) - 18000) / 9000;
+  const ridge = Math.min(east, 1.6) ** 1.6 * 1100 * (0.55 + 0.9 * fbm(e / 5000, n / 5000));
+  const undulate = (fbm(e / 1800 + 7, n / 1800 - 3) - 0.5) * 18;
+  const flatPad = Math.min(1, Math.hypot(e, n) / 600);
+  return (ridge + undulate) * flatPad;
+}
+{
+  const size = 90000, seg = 240;
+  const g = new THREE.PlaneGeometry(size, size, seg, seg);
+  g.rotateX(-Math.PI / 2);
+  const pos = g.attributes.position, colors = [];
+  const sand = new THREE.Color("#c9ad86"), scrub = new THREE.Color("#a79470"), rock = new THREE.Color("#8d7a66");
+  for (let i = 0; i < pos.count; i++) {
+    const e = pos.getX(i), n = -pos.getZ(i), h = terrainHeight(e, n);
+    pos.setY(i, h - 0.2);
+    const c = sand.clone().lerp(scrub, fbm(e / 700, n / 700) * 0.9).lerp(rock, Math.min(1, h / 700)).convertSRGBToLinear();
+    colors.push(c.r, c.g, c.b);
+  }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
+  const grid = new THREE.GridHelper(40000, 40, 0x6d5d48, 0x6d5d48);
+  grid.material.transparent = true; grid.material.opacity = 0.16; grid.position.y = 0.3;
+  scene.add(grid);
+}
+
+// --- Pad and launch tower -------------------------------------------------------
+const railDir = enu(0, Math.cos(EL), Math.sin(EL)).normalize();
+{
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 0.4, 40), new THREE.MeshLambertMaterial({ color: 0x9c978d }));
+  pad.position.y = 0.2;
+  scene.add(pad);
+  const steel = new THREE.MeshLambertMaterial({ color: 0x5b6670 });
+  const tower = new THREE.Group();
+  const L = V.rail_length + 1.5, w = 0.55;
+  for (const [dx, dz] of [[-w, -w], [w, -w], [-w, w], [w, w]]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, L, 0.08), steel);
+    leg.position.set(dx, L / 2, dz);
+    tower.add(leg);
+  }
+  for (let y = 1; y < L; y += 1.2) {
+    for (const [sx, sz, rx, rz] of [[2 * w, 0.05, 0, -w], [2 * w, 0.05, 0, w], [0.05, 2 * w, -w, 0], [0.05, 2 * w, w, 0]]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.05, sz), steel);
+      bar.position.set(rx, y, rz);
+      tower.add(bar);
+    }
+  }
+  tower.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), railDir);
+  tower.position.copy(enu(0, -0.35, 0));
+  scene.add(tower);
+}
+
+// --- Rocket model, built to the design's dimensions ---------------------------------
+// Model frame: +Y is the nose direction; origin at the nose tip, body along -Y.
+function buildBody(mats) {
+  const body = new THREE.Group();
+  const R = V.diameter / 2, L = V.length, Ln = V.nose_length;
+  const rho = (R * R + Ln * Ln) / (2 * R), pts = [];
+  for (let i = 0; i <= 32; i++) {
+    const x = Ln * i / 32;
+    pts.push(new THREE.Vector2(Math.max(Math.sqrt(rho * rho - (Ln - x) ** 2) + R - rho, 1e-4), -x));
+  }
+  body.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 32), mats.white));
+  function tube(from, to, mat) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(R, R, to - from, 32, 1, true), mat);
+    m.position.y = -(from + to) / 2;
+    body.add(m);
+  }
+  const [ox, fu] = V.tanks;
+  tube(Ln, ox[0], mats.roll);
+  tube(ox[0], ox[0] + ox[1], mats.tank);
+  tube(ox[0] + ox[1], fu[0], mats.white);
+  tube(fu[0], fu[0] + fu[1], mats.tank);
+  tube(fu[0] + fu[1], L, mats.white);
+  const aft = new THREE.Mesh(new THREE.CircleGeometry(R, 32), mats.dark);
+  aft.rotation.x = Math.PI / 2; aft.position.y = -L;
+  body.add(aft);
+  const re = V.nozzle_exit_diameter / 2;
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(re * 0.55, re, 0.09, 24, 1, true), mats.dark);
+  nozzle.position.y = -L - 0.045;
+  body.add(nozzle);
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(V.fin_span, -V.fin_sweep);
+  shape.lineTo(V.fin_span, -V.fin_sweep - V.fin_tip);
+  shape.lineTo(0, -V.fin_root);
+  shape.closePath();
+  const finGeom = new THREE.ExtrudeGeometry(shape, { depth: V.fin_thickness, bevelEnabled: false });
+  finGeom.translate(R, 0, -V.fin_thickness / 2);
+  for (let k = 0; k < V.fins; k++) {
+    const fin = new THREE.Mesh(finGeom, mats.dark);
+    fin.position.y = -(L - V.fin_root);
+    fin.rotation.y = k * 2 * Math.PI / V.fins;
+    body.add(fin);
+  }
+  body.position.y = V.x_cg;         // group origin = centre of gravity (the navigated point)
+  return body;
+}
+const tex = document.createElement("canvas"); tex.width = 64; tex.height = 8;
+{
+  const cx = tex.getContext("2d");
+  for (let i = 0; i < 4; i++) { cx.fillStyle = i % 2 ? "#141414" : "#f2f2ee"; cx.fillRect(i * 16, 0, 16, 8); }
+}
+const rocket = new THREE.Group();
+const body = buildBody({
+  white: new THREE.MeshLambertMaterial({ color: 0xf2f2ee }),
+  roll: new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(tex) }),
+  tank: new THREE.MeshLambertMaterial({ color: 0xc9ccd0 }),
+  dark: new THREE.MeshLambertMaterial({ color: 0x2a2d31 }),
+});
+rocket.add(body);
+
+// The estimate: the same rocket in translucent cyan
+const ghostMat = new THREE.MeshLambertMaterial({ color: EST_COLOR, emissive: 0x0d4a5c, transparent: true, opacity: 0.42, depthWrite: false });
+const ghost = new THREE.Group();
+ghost.add(buildBody({ white: ghostMat, roll: ghostMat, tank: ghostMat, dark: ghostMat }));
+ghost.renderOrder = 2;
+
+// 3-sigma uncertainty ellipsoid: a soft shell, brighter at the rim
+const bubbleMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+  uniforms: { uColor: { value: new THREE.Color(EST_COLOR) } },
+  vertexShader: `#include <common>
+    #include <logdepthbuf_pars_vertex>
+    varying vec3 vN; varying vec3 vV;
+    void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz);
+      gl_Position = projectionMatrix*mv;
+      #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: `#include <logdepthbuf_pars_fragment>
+    uniform vec3 uColor; varying vec3 vN; varying vec3 vV;
+    void main(){
+      #include <logdepthbuf_fragment>
+      float rim = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+      gl_FragColor = vec4(uColor, 0.05 + 0.55*pow(rim, 3.0));
+    }`,
+});
+const bubble = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), bubbleMat);
+bubble.renderOrder = 3;
+
+// The error vector (real rocket -> estimate) and a fixed-size dot on the estimate, visible from afar
+const errLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(1, 0, 0)]),
+  new THREE.LineBasicMaterial({ color: 0xffd08a, depthTest: false, transparent: true }));
+errLine.renderOrder = 5; errLine.frustumCulled = false;
+const estDot = new THREE.Points(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3()]),
+  new THREE.PointsMaterial({ color: EST_COLOR, size: 9, sizeAttenuation: false, depthTest: false, transparent: true }));
+estDot.renderOrder = 6; estDot.frustumCulled = false;
+
+// Engine flame (on the real rocket)
+const flameMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, fog: false,
+  uniforms: { uTime: { value: 0 }, uPower: { value: 1 } },
+  vertexShader: `#include <common>
+    #include <logdepthbuf_pars_vertex>
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.);
+      #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: `#include <logdepthbuf_pars_fragment>
+    uniform float uTime; uniform float uPower; varying vec2 vUv;
+    void main(){
+      #include <logdepthbuf_fragment>
+      float along = 1.0 - vUv.y;
+      float flick = 0.85 + 0.15*sin(uTime*55.0 + along*20.0);
+      vec3 core = vec3(1.0, 0.95, 0.85), outer = vec3(1.0, 0.45, 0.12);
+      vec3 col = mix(core, outer, smoothstep(0.0, 0.55, along));
+      float a = (1.0 - smoothstep(0.1, 1.0, along)) * flick * uPower;
+      gl_FragColor = vec4(col, a);
+    }`,
+});
+const flame = new THREE.Mesh(new THREE.CylinderGeometry(V.nozzle_exit_diameter / 2, 0.25, 1, 20, 1, true), flameMat);
+flame.geometry.translate(0, -0.5, 0);
+flame.position.y = -V.length - 0.09;
+body.add(flame);
+const glow = new THREE.PointLight(0xff9a4a, 0, 60, 2);
+glow.position.y = -V.length - 0.6;
+body.add(glow);
+scene.add(rocket, ghost, bubble, errLine, estDot);
+
+// --- Flights ----------------------------------------------------------------------
+const lift = (V.length - V.x_cg) * Math.sin(EL) + 0.4;   // tail just above the pad at T-0
+const tmpM = new THREE.Matrix4();
+function bodyToThree(w, x, y, z) {
+  // Body axes in ENU from the attitude quaternion, then model axes in three.js
+  const xb = [1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)];
+  const yb = [2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)];
+  const zb = [2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)];
+  tmpM.makeBasis(enu(...yb), enu(...xb), enu(...zb).negate());
+  return new THREE.Quaternion().setFromRotationMatrix(tmpM);
+}
+const flights = DATA.flights.map((f) => {
+  const c = Object.fromEntries(f.columns.map((k, i) => [k, i]));
+  const n = f.rows.length;
+  const F = { label: f.label, blurb: f.blurb, events: f.events, spans: f.spans, n, rows: f.rows, c,
+    t: new Float64Array(n), pos: [], est: [], qT: [], qE: [], hErr: new Float32Array(n), h3s: new Float32Array(n) };
+  f.rows.forEach((r, i) => {
+    F.t[i] = r[c.t];
+    F.pos.push(enu(r[c.rE], r[c.rN], r[c.rU] + lift));
+    F.est.push(enu(r[c.eE], r[c.eN], r[c.eU] + lift));
+    F.qT.push(bodyToThree(r[c.qw], r[c.qx], r[c.qy], r[c.qz]));
+    F.qE.push(bodyToThree(r[c.ew], r[c.ex], r[c.ey], r[c.ez]));
+    F.hErr[i] = Math.hypot(r[c.eE] - r[c.rE], r[c.eN] - r[c.rN]);
+    F.h3s[i] = Math.hypot(r[c.s3E], r[c.s3N]);
+  });
+  F.t0 = F.t[0]; F.tEnd = F.t[n - 1];
+  // Truth path coloured by phase
+  const p = [], col = [];
+  F.pos.forEach((v, i) => { p.push(v.x, v.y, v.z); const k = new THREE.Color(PHASE_COLORS[f.rows[i][c.phase]]).convertSRGBToLinear(); col.push(k.r, k.g, k.b); });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  F.path = new THREE.Line(g, new THREE.LineBasicMaterial({ vertexColors: true }));
+  F.estPath = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: EST_COLOR, transparent: true, opacity: 0.9 }));
+  scene.add(F.path, F.estPath);
+  // GPS fixes (measured positions, noise and all)
+  F.gps = f.gps.map(([t, e, nn, u]) => ({ t, fix: enu(e, nn, u + lift) }));
+  // Exhaust puffs while the engine runs
+  F.puffs = [];
+  F.pos.forEach((v, i) => {
+    if (f.rows[i][c.throttle] > 0.05) {
+      const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(F.qT[i]);
+      F.puffs.push({ t: F.t[i], p: v.clone().addScaledVector(axis, -(V.length - V.x_cg)) });
+    }
+  });
+  return F;
+});
+
+function findIndex(f, t) {
+  let lo = 0, hi = f.n - 1;
+  if (t <= f.t[0]) return 0;
+  if (t >= f.t[hi]) return hi - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (f.t[mid] <= t) lo = mid; else hi = mid; }
+  return lo;
+}
+
+// Point sprites with per-point size and alpha (exhaust and GPS fixes)
+function spriteCloud(count, color, scale) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(count * 3), 3));
+  geo.setAttribute("size", new THREE.Float32BufferAttribute(new Float32Array(count), 1));
+  geo.setAttribute("alpha", new THREE.Float32BufferAttribute(new Float32Array(count), 1));
+  const pts = new THREE.Points(geo, new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uScale: { value: scale }, uColor: { value: new THREE.Color(color) } },
+    vertexShader: `#include <common>
+      #include <logdepthbuf_pars_vertex>
+      attribute float size; attribute float alpha; varying float vA; uniform float uScale;
+      void main(){ vA = alpha; vec4 mv = modelViewMatrix*vec4(position,1.); gl_PointSize = max(size*uScale/max(-mv.z, 1.), 3.0); gl_Position = projectionMatrix*mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: `#include <logdepthbuf_pars_fragment>
+      uniform vec3 uColor; varying float vA; void main(){
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord-0.5); float a = vA*smoothstep(0.5,0.3,d); gl_FragColor = vec4(uColor, a); }`,
+  }));
+  pts.frustumCulled = false;
+  return pts;
+}
+const exhaust = spriteCloud(Math.max(...flights.map((f) => f.puffs.length)), 0xf7f5f0, 400);
+const gpsDots = spriteCloud(Math.max(...flights.map((f) => f.gps.length)), GPS_COLOR, 600);
+gpsDots.renderOrder = 4;
+scene.add(exhaust, gpsDots);
+
+// --- State ---------------------------------------------------------------------------
+const state = { flight: 0, t: -5, playing: !reduceMotion, speed: 1, cam: "chase", mag: 1 };
+const $ = (id) => document.getElementById(id);
+const F = () => flights[state.flight];
+const tToU = (t) => (t - F().t0) / (F().tEnd - F().t0);
+const uToT = (u) => F().t0 + u * (F().tEnd - F().t0);
+
+function rebuildEstPath() {
+  const f = F(), p = [];
+  f.est.forEach((e) => p.push(e.x, e.y, e.z));
+  f.estPath.geometry.dispose();
+  f.estPath.geometry = new THREE.BufferGeometry();
+  f.estPath.geometry.setAttribute("position", new THREE.Float32BufferAttribute(p, 3));
+}
+
+function buildFlightUI() {
+  const sel = $("flightSel");
+  sel.innerHTML = "";
+  flights.forEach((f, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = f.label; b.setAttribute("aria-pressed", String(i === state.flight));
+    b.addEventListener("click", () => selectFlight(i));
+    sel.appendChild(b);
+  });
+  $("blurb").textContent = F().blurb;
+  const ticks = $("ticks");
+  ticks.innerHTML = "";
+  for (const s of F().spans) {
+    const d = document.createElement("div");
+    d.className = "band"; d.title = s.name;
+    d.style.left = (tToU(s.t0) * 100) + "%"; d.style.width = ((tToU(s.t1) - tToU(s.t0)) * 100) + "%";
+    ticks.appendChild(d);
+  }
+  for (const e of F().events) {
+    const d = document.createElement("div");
+    const u = tToU(e.t);
+    d.className = (u > 0.97 ? "tick end" : "tick") + (e.name === "Mach 1" || e.name === "Burnout" ? " minor" : "");
+    d.style.left = (u * 100) + "%"; d.textContent = e.name;
+    ticks.appendChild(d);
+  }
+  rebuildEstPath();
+  const show = $("showPath").checked;
+  flights.forEach((f, i) => { f.path.visible = f.estPath.visible = show && i === state.flight; });
+  drawChart();
+}
+
+function selectFlight(i) { state.flight = i; buildFlightUI(); }
+
+function setMag(m) {
+  state.mag = m;
+  document.querySelectorAll("#magSel button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.mag) === m)));
+  $("magNote").textContent = m > 1 ? `The estimate's pointing error is drawn ${m}× larger than life. Positions are true size.` : "";
+}
+
+// --- Error rows in the telemetry panel ---------------------------------------------------
+const ERR_ROWS = [
+  ["Horizontal", "m"], ["Altitude", "m"], ["Velocity", "m/s"], ["Pointing", "°"], ["Roll", "°"],
+];
+const errEls = ERR_ROWS.map(([name]) => {
+  const box = $("errs");
+  const l = document.createElement("span"); l.textContent = name;
+  const e = document.createElement("span"); e.className = "v";
+  const s = document.createElement("span"); s.className = "v";
+  const m = document.createElement("div"); m.className = "meter"; m.title = "error as a fraction of 3σ";
+  const bar = document.createElement("span"); m.appendChild(bar);
+  box.append(l, e, s, m);
+  return { e, s, bar };
+});
+
+// --- Chart: horizontal error vs 3-sigma ------------------------------------------------
+const chart = $("chart");
+function drawChart() {
+  const dpr = Math.min(window.devicePixelRatio, 2), w = chart.clientWidth, h = chart.clientHeight;
+  if (!w) return;
+  chart.width = w * dpr; chart.height = h * dpr;
+  const c = chart.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const f = F();
+  let ymax = 0;
+  for (let i = 0; i < f.n; i++) ymax = Math.max(ymax, f.h3s[i]);
+  ymax *= 1.1;
+  const X = (t) => tToU(t) * w, Y = (v) => h - 2 - v / ymax * (h - 14);
+  c.fillStyle = "rgba(255,107,94,0.22)";
+  for (const s of f.spans) c.fillRect(X(s.t0), 0, X(s.t1) - X(s.t0), h);
+  c.beginPath(); c.moveTo(X(f.t[0]), Y(0));
+  for (let i = 0; i < f.n; i++) c.lineTo(X(f.t[i]), Y(f.h3s[i]));
+  c.lineTo(X(f.tEnd), Y(0)); c.closePath();
+  c.fillStyle = "rgba(92,225,255,0.18)"; c.fill();
+  c.strokeStyle = "rgba(92,225,255,0.7)"; c.lineWidth = 1; c.stroke();
+  c.beginPath();
+  for (let i = 0; i < f.n; i++) (i ? c.lineTo : c.moveTo).call(c, X(f.t[i]), Y(f.hErr[i]));
+  c.strokeStyle = "#eef3f6"; c.lineWidth = 1.4; c.stroke();
+  c.fillStyle = "#74889a"; c.font = "11px 'IBM Plex Mono', monospace";
+  c.fillText(Math.round(ymax) + " m", 3, 10);
+  chart.dataset.w = w; chart.dataset.h = h;
+}
+function drawCursor(t) {
+  // Redraw the chart with a cursor at the current time (every few frames)
+  const c = chart.getContext("2d"), w = +chart.dataset.w, h = +chart.dataset.h;
+  if (!w) return;
+  drawChart();
+  c.strokeStyle = "#ffd08a"; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(tToU(t) * w, 0); c.lineTo(tToU(t) * w, h); c.stroke();
+}
+
+// --- Cameras -------------------------------------------------------------------------
+const TRACK_CAM = enu(-450, -250, 1.7);
+const prevRocket = new THREE.Vector3();
+function setCamera(mode) {
+  state.cam = mode;
+  document.querySelectorAll("#camSel button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.cam === mode)));
+  controls.enabled = mode !== "tracking";
+  camera.fov = 45;
+  if (mode === "chase") {
+    camera.position.copy(rocket.position).add(new THREE.Vector3(14, 3, 18));
+    controls.target.copy(rocket.position);
+    controls.minDistance = 3; controls.maxDistance = 2000;
+  } else if (mode === "overview") {
+    const f = F();
+    const box = new THREE.Box3().setFromPoints(f.pos);
+    const ctr = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    const d = Math.max(size.x, size.y, size.z) * 1.25;
+    camera.position.copy(ctr).add(new THREE.Vector3(d * 0.75, d * 0.1, d * 0.75));
+    controls.target.copy(ctr);
+    controls.minDistance = 50; controls.maxDistance = 90000;
+  } else {
+    camera.position.copy(TRACK_CAM);
+  }
+  prevRocket.copy(rocket.position);
+  camera.updateProjectionMatrix();
+}
+
+// --- Per-frame update ----------------------------------------------------------------
+const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), axis = new THREE.Vector3();
+function fmtClock(t) {
+  const s = Math.abs(t), m = Math.floor(s / 60), r = s - 60 * m;
+  return (t < 0 ? "T−" : "T+") + String(m).padStart(2, "0") + ":" + r.toFixed(1).padStart(4, "0");
+}
+const lerp = (a, b, x) => a + (b - a) * x;
+
+function update(t, now) {
+  const f = F(), c = f.c;
+  const i = findIndex(f, t), a = Math.min(1, Math.max(0, (t - f.t[i]) / (f.t[i + 1] - f.t[i] || 1)));
+  const r0 = f.rows[i], r1 = f.rows[i + 1], row = a < 0.5 ? r0 : r1;
+  const col = (k) => lerp(r0[c[k]], r1[c[k]], a);
+  const mag = state.mag;
+
+  // Truth
+  rocket.position.lerpVectors(f.pos[i], f.pos[i + 1], a);
+  rocket.quaternion.copy(f.qT[i]).slerp(f.qT[i + 1], a);
+
+  // Estimate: true-size position; the attitude error can be exaggerated (mag)
+  ghost.position.lerpVectors(f.est[i], f.est[i + 1], a);
+  tmpQ.copy(f.qE[i]).slerp(f.qE[i + 1], a);
+  const rel = rocket.quaternion.clone().invert().multiply(tmpQ);       // estimate relative to truth, model frame
+  if (rel.w < 0) rel.set(-rel.x, -rel.y, -rel.z, -rel.w);
+  const ang = 2 * Math.acos(Math.min(1, rel.w)), s = Math.sqrt(Math.max(1e-16, 1 - rel.w * rel.w));
+  axis.set(rel.x / s, rel.y / s, rel.z / s);
+  ghost.quaternion.copy(rocket.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(axis, ang * mag));
+  ghost.visible = estDot.visible = errLine.visible = $("showGhost").checked;
+  errLine.geometry.attributes.position.setXYZ(0, rocket.position.x, rocket.position.y, rocket.position.z);
+  errLine.geometry.attributes.position.setXYZ(1, ghost.position.x, ghost.position.y, ghost.position.z);
+  errLine.geometry.attributes.position.needsUpdate = true;
+  estDot.position.copy(ghost.position);
+
+  // 3-sigma bubble around the estimate (ENU axes -> three.js x, y, z)
+  bubble.position.copy(ghost.position);
+  bubble.scale.set(Math.max(0.05, col("s3E")), Math.max(0.05, col("s3U")), Math.max(0.05, col("s3N")));
+  bubble.visible = $("showBubble").checked;
+
+  // Engine
+  const thr = col("throttle");
+  const alt = (rocket.position.y - lift) / FT;
+  flame.visible = thr > 0.01;
+  flameMat.uniforms.uTime.value = now / 1000;
+  flameMat.uniforms.uPower.value = Math.min(1, thr * 1.2);
+  flame.scale.set(1 + alt / 12000, (2.4 + alt / 5000) * thr * (0.93 + 0.07 * Math.random()), 1 + alt / 12000);
+  glow.intensity = thr * 2.5;
+
+  // Paths drawn so far
+  f.path.geometry.setDrawRange(0, i + 2);
+  f.estPath.geometry.setDrawRange(0, i + 2);
+
+  // Exhaust
+  {
+    const pos = exhaust.geometry.attributes.position, size = exhaust.geometry.attributes.size, alpha = exhaust.geometry.attributes.alpha;
+    for (let k = 0; k < pos.count; k++) {
+      const p = f.puffs[k], age = p ? t - p.t : -1;
+      if (!p || age < 0) { alpha.setX(k, 0); continue; }
+      pos.setXYZ(k, p.p.x + 6 * age, p.p.y + 0.4 * age, p.p.z);
+      size.setX(k, 0.8 + Math.min(age, 90) * 0.9);
+      alpha.setX(k, 0.5 * Math.exp(-age / 45));
+    }
+    pos.needsUpdate = size.needsUpdate = alpha.needsUpdate = true;
+  }
+
+  // GPS fixes: each dot lives 2.5 s
+  {
+    const pos = gpsDots.geometry.attributes.position, size = gpsDots.geometry.attributes.size, alpha = gpsDots.geometry.attributes.alpha;
+    const show = $("showGps").checked;
+    for (let k = 0; k < pos.count; k++) {
+      const g = f.gps[k], age = g ? t - g.t : -1;
+      if (!g || !show || age < 0 || age > 2.5) { alpha.setX(k, 0); continue; }
+      pos.setXYZ(k, g.fix.x, g.fix.y, g.fix.z);
+      size.setX(k, 0.2);
+      alpha.setX(k, 0.95 * (1 - age / 2.5));
+    }
+    pos.needsUpdate = size.needsUpdate = alpha.needsUpdate = true;
+  }
+
+  // Telemetry
+  const ph = row[c.phase];
+  $("clock").textContent = fmtClock(t);
+  $("phaseName").textContent = PHASES[ph];
+  $("phaseDot").style.background = PHASE_COLORS[ph];
+  $("alt").textContent = Math.max(0, Math.round(alt)).toLocaleString();
+  $("spd").textContent = Math.round(col("speed") / KN).toLocaleString();
+  $("mach").textContent = col("mach").toFixed(2);
+  $("sMode").innerHTML = row[c.pad]
+    ? '<i class="dot warn"></i>Pad calibration (zero-velocity, zero-rate)'
+    : '<i class="dot"></i>Flight: IMU at 200 Hz, fixes as they come';
+  $("sGps").innerHTML = ['<i class="dot"></i>Fix, 10 Hz', '<i class="dot bad"></i>No fix: over 1,000 knots',
+    '<i class="dot bad"></i>Lost (dropout)'][row[c.gps]];
+  $("sBaro").innerHTML = row[c.baro]
+    ? `<i class="dot warn"></i>Ignored: Mach ${DATA.lockout[0]}–${DATA.lockout[1]}` : '<i class="dot"></i>50 Hz';
+
+  const rT = rocket.position, rE = tmpV.lerpVectors(f.est[i], f.est[i + 1], a);
+  const hE = Math.hypot(rE.x - rT.x, rE.z - rT.z), hS = Math.hypot(col("s3E"), col("s3N"));
+  const vE = Math.hypot(col("evE"), col("evN"), col("evU")), vS = Math.hypot(col("s3vE"), col("s3vN"), col("s3vU"));
+  const pE = Math.hypot(col("epitch"), col("eyaw")), pS = Math.hypot(col("s3pitch"), col("s3yaw"));
+  const vals = [[hE, hS, 1], [Math.abs(rE.y - rT.y), col("s3U"), 1], [vE, vS, 2], [pE, pS, 2], [Math.abs(col("eroll")), col("s3roll"), 2]];
+  vals.forEach(([e, s, d], k) => {
+    const el = errEls[k];
+    el.e.textContent = e.toFixed(d) + " " + ERR_ROWS[k][1];
+    el.s.textContent = s.toFixed(d);
+    const frac = e / s;
+    el.bar.style.width = Math.min(100, frac * 100).toFixed(0) + "%";
+    el.bar.className = frac > 1 ? "over" : "";
+  });
+  if (document.activeElement !== $("scrub")) $("scrub").value = Math.round(tToU(t) * 1000);
+}
+
+function updateCamera() {
+  if (state.cam === "chase") {
+    tmpV.copy(rocket.position).sub(prevRocket);
+    camera.position.add(tmpV);
+    controls.target.copy(rocket.position);
+  } else if (state.cam === "tracking") {
+    camera.position.copy(TRACK_CAM);
+    camera.lookAt(rocket.position);
+    const d = camera.position.distanceTo(rocket.position);
+    const extent = Math.max(V.length * 3, 2.5 * bubble.scale.x, 2.5 * bubble.scale.y);
+    camera.fov = THREE.MathUtils.clamp(2 * Math.atan(extent / d) * 180 / Math.PI, 0.3, 50);
+    camera.updateProjectionMatrix();
+  }
+  prevRocket.copy(rocket.position);
+}
+
+function updateTag() {
+  const tag = $("tag");
+  const d = camera.position.distanceTo(rocket.position);
+  const screenLen = V.length / (d * Math.tan(camera.fov * Math.PI / 360)) * canvas.clientHeight / 2;
+  tmpV.copy(rocket.position).project(camera);
+  const onScreen = tmpV.z < 1 && Math.abs(tmpV.x) < 1.05 && Math.abs(tmpV.y) < 1.05;
+  tag.hidden = !onScreen || screenLen > 60;
+  if (!tag.hidden) {
+    tag.style.left = ((tmpV.x + 1) / 2 * canvas.clientWidth) + "px";
+    tag.style.top = ((1 - tmpV.y) / 2 * canvas.clientHeight) + "px";
+    tag.textContent = "E5-75  " + Math.max(0, Math.round((rocket.position.y - lift) / FT)).toLocaleString() + " ft";
+  }
+}
+
+// --- Controls wiring -----------------------------------------------------------------
+function setPlaying(p) {
+  state.playing = p;
+  $("play").setAttribute("aria-label", p ? "Pause" : "Play");
+  $("playIcon").innerHTML = p
+    ? '<rect x="3" y="2" width="3.5" height="12"/><rect x="9.5" y="2" width="3.5" height="12"/>'
+    : '<path d="M4 2 L14 8 L4 14 Z"/>';
+}
+$("play").addEventListener("click", () => {
+  if (!state.playing && state.t >= F().tEnd) state.t = F().t0;
+  setPlaying(!state.playing);
+});
+$("scrub").addEventListener("input", (e) => { state.t = uToT(e.target.value / 1000); });
+document.querySelectorAll("#speedSel button").forEach((b) => b.addEventListener("click", () => {
+  state.speed = Number(b.dataset.speed);
+  document.querySelectorAll("#speedSel button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+}));
+document.querySelectorAll("#camSel button").forEach((b) => b.addEventListener("click", () => setCamera(b.dataset.cam)));
+document.querySelectorAll("#magSel button").forEach((b) => b.addEventListener("click", () => setMag(Number(b.dataset.mag))));
+$("showPath").addEventListener("change", buildFlightUI);
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && e.target === document.body) { e.preventDefault(); $("play").click(); }
+});
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  drawChart();
+}
+window.addEventListener("resize", resize);
+
+// --- Shots: a link ending in #pad, #boost, #blackout, #tracking, #recovery or #overview opens
+// paused at that moment with that camera.
+const SHOTS = {
+  pad: { flight: 0, t: -2.0, cam: "chase", mag: 1, offset: [6, 1.0, 9] },
+  boost: { flight: 0, t: 3.2, cam: "chase", mag: 50, offset: [-7, 1.5, 10] },
+  blackout: { flight: 1, t: 17.0, cam: "chase", mag: 1, offset: [22, 42, 48] },
+  tracking: { flight: 1, t: 12.0, cam: "tracking", mag: 1 },
+  recovery: { flight: 1, t: 22.6, cam: "chase", mag: 1, offset: [14, 2, 18] },
+  overview: { flight: 1, t: 16.0, cam: "overview", mag: 10 },
+};
+function applyShot(name) {
+  const s = SHOTS[name];
+  if (!s) return false;
+  state.flight = s.flight; state.t = s.t;
+  setMag(s.mag);
+  buildFlightUI();
+  setPlaying(false);
+  update(state.t, performance.now());
+  setCamera(s.cam);
+  if (s.offset) camera.position.copy(rocket.position).add(new THREE.Vector3(...s.offset));
+  return true;
+}
+
+// --- Main loop ---------------------------------------------------------------------------
+setMag(1);
+buildFlightUI();
+setPlaying(state.playing);
+resize();
+update(state.t, performance.now());
+setCamera("chase");
+applyShot(location.hash.slice(1));
+window.addEventListener("hashchange", () => applyShot(location.hash.slice(1)));
+let last = performance.now(), frameNo = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (state.playing) {
+    state.t += dt * state.speed;
+    if (state.t >= F().tEnd) { state.t = F().tEnd; setPlaying(false); }
+  }
+  update(state.t, now);
+  updateCamera();
+  if (state.cam !== "tracking") controls.update();
+  updateTag();
+  if (frameNo++ % 6 === 0) drawCursor(state.t);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>

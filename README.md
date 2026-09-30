@@ -27,6 +27,11 @@ The pipeline:
 
 Every model is checked against exact answers first (see [Validation](#validation)).
 
+**[▶ Watch the filter fly in 3D](https://momokazmi1017.github.io/RocketNavigationEKF/viewer/nav_viewer.html)**
+(interactive replay in the browser; see [3D navigation replay](#3d-navigation-replay))
+
+![GPS blackout in the 3D replay: the estimate drifts inside its growing uncertainty bubble](outputs/viewer/blackout.png)
+
 ![Navigation error with the filter's 3-sigma bounds](outputs/nav_errors.png)
 
 ## Results at a glance
@@ -196,6 +201,39 @@ The error is set mostly **on the pad**. The accelerometer bias limits how well
 gravity can level the rocket. And gravity says nothing about the *direction*
 of the rail's lean, so the rail survey limits the pointing error. Better rail
 alignment would buy most of what the expensive IMU does.
+
+## 3D navigation replay
+
+**[Open the replay in your browser](https://momokazmi1017.github.io/RocketNavigationEKF/viewer/nav_viewer.html)**,
+or download [`viewer/nav_viewer.html`](viewer/nav_viewer.html) and open it
+locally. It is one self-contained file; three.js loads from a CDN. It extends
+the [project 2 flight replay](https://momokazmi1017.github.io/FlightSim6DOF/viewer/flight_viewer.html).
+
+| | |
+|---|---|
+| ![On the pad](outputs/viewer/pad.png) | ![Boost, pointing error x50](outputs/viewer/boost.png) |
+| On the pad: calibrating, with the estimate 3 m off inside a tall bubble (GPS is worse vertically) | Mach 0.8: barometer locked out; the pointing error drawn 50× so it shows |
+| ![GPS blackout](outputs/viewer/blackout.png) | ![GPS back](outputs/viewer/recovery.png) |
+| 15 s without GPS: 19 m off, inside a flat 29 m bubble (the barometer still holds altitude) | 0.6 s after the fix returns: back to 0.9 m, the bubble collapsed |
+
+- **The real rocket** flies the 6-DOF truth. **A translucent cyan rocket** flies
+  where the filter thinks it is, and points where the filter thinks it points.
+  A **yellow line** joins them: the estimation error.
+- **The 3σ bubble** is the filter's own uncertainty ellipsoid (east, north, up)
+  around its estimate. If the filter is honest, the real rocket stays inside.
+- **Green dots** are the GPS fixes as they arrive, noise and all. They stop
+  above 1,000 knots and during the dropout.
+- **Live panel:** filter mode (pad calibration or flight), each sensor's status
+  (fix / no fix / dropout; barometer used or locked out near Mach 1), and five
+  errors next to their 3σ, with bars that should stay short of full.
+- **Two scenarios:** the nominal crosswind flight, and the same flight (same
+  sensor errors) with a 20 s GPS dropout.
+- Position errors are always drawn true size. Attitude errors are fractions of
+  a degree, so the pointing error can be drawn 10× or 50× larger.
+- Links ending in `#pad`, `#boost`, `#blackout`, `#tracking` or `#recovery`
+  open the replay paused at that moment.
+
+Rebuild it after changing the filter: `python tools/build_viewer.py`.
 
 ## Findings
 
